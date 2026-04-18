@@ -6,6 +6,7 @@ import authRoutes from "./routes/authRoutes";
 import businessRoutes from "./routes/businessRoutes";
 import serviceRoutes from "./routes/serviceRoutes";
 import appointmentRoutes from "./routes/appointmentRoutes";
+import workerRoutes from "./routes/workerRoutes";
 
 dotenv.config();
 
@@ -21,11 +22,13 @@ app.use("/api/auth", authRoutes);
 app.use("/api/businesses", businessRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/appointments", appointmentRoutes);
+app.use("/api/workers", workerRoutes);
 
 // Ruta de prueba
 app.get("/", (req, res) => {
-  res.json({ message: "CitaPro API funcionando correctamente " });
+  res.json({ message: "CitaFacil API funcionando correctamente " });
 });
+
 
 // Servidor
 app.listen(PORT, () => {

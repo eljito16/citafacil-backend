@@ -25,6 +25,7 @@ export const createBusiness = async (req: Request, res: Response): Promise<void>
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error interno del servidor", error });
   }
 };
@@ -39,6 +40,7 @@ export const getBusinesses = async (req: Request, res: Response): Promise<void> 
     res.status(200).json({ businesses: businesses.rows });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error interno del servidor", error });
   }
 };
@@ -58,7 +60,6 @@ export const getBusinessById = async (req: Request, res: Response): Promise<void
       return;
     }
 
-    // Obtener servicios del negocio
     const services = await pool.query(
       `SELECT * FROM services WHERE business_id = $1`,
       [id]
@@ -70,6 +71,7 @@ export const getBusinessById = async (req: Request, res: Response): Promise<void
     });
 
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error interno del servidor", error });
   }
 };
@@ -80,6 +82,9 @@ export const updateBusiness = async (req: Request, res: Response): Promise<void>
     const { id } = req.params;
     const { name, description, category, address, phone, schedule, image } = req.body;
     const ownerId = (req as any).user.id;
+
+    console.log("UPDATE BUSINESS - body:", req.body);
+    console.log("UPDATE BUSINESS - id:", id, "ownerId:", ownerId);
 
     const businessExists = await pool.query(
       `SELECT id FROM businesses WHERE id = $1 AND owner_id = $2`,
@@ -103,6 +108,36 @@ export const updateBusiness = async (req: Request, res: Response): Promise<void>
     });
 
   } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error interno del servidor", error });
+  }
+};
+
+// Eliminar negocio
+export const deleteBusiness = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const ownerId = (req as any).user.id;
+
+    const businessExists = await pool.query(
+      `SELECT id FROM businesses WHERE id = $1 AND owner_id = $2`,
+      [id, ownerId]
+    );
+
+    if (businessExists.rows.length === 0) {
+      res.status(404).json({ message: "Negocio no encontrado o no tienes permisos" });
+      return;
+    }
+
+    await pool.query(`DELETE FROM appointments WHERE business_id = $1`, [id]);
+    await pool.query(`DELETE FROM workers WHERE business_id = $1`, [id]);
+    await pool.query(`DELETE FROM services WHERE business_id = $1`, [id]);
+    await pool.query(`DELETE FROM businesses WHERE id = $1`, [id]);
+
+    res.status(200).json({ message: "Negocio eliminado correctamente" });
+
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ message: "Error interno del servidor", error });
   }
 };

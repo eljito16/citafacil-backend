@@ -8,7 +8,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password, role, full_name, phone, address } = req.body;
 
-    // Validaciones
     if (!username || !password || !role) {
       res.status(400).json({ message: "Username, password y role son obligatorios" });
       return;
@@ -19,7 +18,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Verificar si el usuario ya existe
     const userExists = await pool.query(
       "SELECT id FROM users WHERE username = $1",
       [username]
@@ -30,10 +28,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Encriptar contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Crear usuario
     const newUser = await pool.query(
       `INSERT INTO users (username, password, role, full_name, phone, address)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -41,7 +37,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       [username, hashedPassword, role, full_name, phone, address]
     );
 
-    // Generar token
     const token = jwt.sign(
       { id: newUser.rows[0].id, role: newUser.rows[0].role },
       process.env.JWT_SECRET as string,
@@ -64,13 +59,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { username, password } = req.body;
 
-    // Validaciones
     if (!username || !password) {
       res.status(400).json({ message: "Username y password son obligatorios" });
       return;
     }
 
-    // Buscar usuario
     const userResult = await pool.query(
       "SELECT * FROM users WHERE username = $1",
       [username]
@@ -82,8 +75,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = userResult.rows[0];
-
-    // Verificar contraseña
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
@@ -91,7 +82,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Generar token
     const token = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET as string,
@@ -136,7 +126,6 @@ export const getProfile = async (req: Request, res: Response): Promise<void> => 
   } catch (error) {
     res.status(500).json({ message: "Error interno del servidor", error });
   }
-  
 };
 
 // Actualizar perfil
@@ -156,6 +145,46 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
       message: "Perfil actualizado correctamente",
       user: updatedUser.rows[0],
     });
+
+  } catch (error) {
+    res.status(500).json({ message: "Error interno del servidor", error });
+  }
+};
+
+// Eliminar cuenta
+export const deleteAccount = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const role = (req as any).user.role;
+
+    // Si es negocio, eliminar todo lo relacionado primero
+    if (role === "negocio") {
+      // Obtener el negocio del usuario
+      const businessResult = await pool.query(
+        `SELECT id FROM businesses WHERE owner_id = $1`,
+        [userId]
+      );
+
+      if (businessResult.rows.length > 0) {
+        const businessId = businessResult.rows[0].id;
+
+        // Eliminar en cascada
+        await pool.query(`DELETE FROM appointments WHERE business_id = $1`, [businessId]);
+        await pool.query(`DELETE FROM workers WHERE business_id = $1`, [businessId]);
+        await pool.query(`DELETE FROM services WHERE business_id = $1`, [businessId]);
+        await pool.query(`DELETE FROM businesses WHERE id = $1`, [businessId]);
+      }
+    }
+
+    // Si es cliente, eliminar sus citas
+    if (role === "cliente") {
+      await pool.query(`DELETE FROM appointments WHERE client_id = $1`, [userId]);
+    }
+
+    // Eliminar el usuario
+    await pool.query(`DELETE FROM users WHERE id = $1`, [userId]);
+
+    res.status(200).json({ message: "Cuenta eliminada correctamente" });
 
   } catch (error) {
     res.status(500).json({ message: "Error interno del servidor", error });
